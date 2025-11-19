@@ -1,23 +1,19 @@
 import React, { useState } from "react";
-import { View } from "react-native";
+import { View, Text } from "react-native";
 import LanguageSelector from "../components/screens/LanguageSelector";
 import AuthScreen from "../components/screens/AuthScreen";
+import HomeScreen from "../components/screens/HomeScreen";
 
 export default function Index() {
-  // State for selected language (updated on language select)
- const [selectedLanguage, setSelectedLanguage] = useState("en");
-
-  // State for confirmed language after pressing Continue
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const [confirmedLanguage, setConfirmedLanguage] = useState<string | null>(null);
   const [loggedInUser, setLoggedInUser] = useState<string | null>(null);
   const [guestMode, setGuestMode] = useState(false);
 
-  // Called whenever user picks a language in LanguageSelector
   const onLanguageSelect = (code: string) => {
     setSelectedLanguage(code);
   };
 
-  // Called when user clicks "Continue" in LanguageSelector
   const onContinue = () => {
     if (selectedLanguage) {
       setConfirmedLanguage(selectedLanguage);
@@ -26,42 +22,43 @@ export default function Index() {
     }
   };
 
-  // Called after successful login
   const onLogin = (user: string) => {
     setLoggedInUser(user);
     console.log("Logged in as", user);
   };
 
-  // Called if guest mode clicked
   const onGuestMode = () => {
     setGuestMode(true);
     console.log("Guest mode active");
   };
 
-  // Rendering logic:
-  // 1. Show LanguageSelector until user presses Continue
+  // SHOW LanguageSelector if language not confirmed yet
   if (!confirmedLanguage) {
     return (
       <LanguageSelector
-  selectedLanguage={selectedLanguage}
-  onLanguageSelect={onLanguageSelect}
-  onContinue={onContinue}
-/>
-
+        selectedLanguage={selectedLanguage}
+        onLanguageSelect={onLanguageSelect}
+        onContinue={onContinue}
+      />
     );
   }
 
-  // 2. Show AuthScreen if logged out and not in guest mode
+  // SHOW AuthScreen if user not logged in and not guest
   if (!loggedInUser && !guestMode) {
     return <AuthScreen onLogin={onLogin} onGuestMode={onGuestMode} />;
   }
 
-  // 3. Show placeholders or real app screen after login or guest mode
+  // SHOW HomeScreen after login or guest
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <View>Language Selected: {confirmedLanguage}</View>
-      {loggedInUser && <View>Logged In as: {loggedInUser}</View>}
-      {guestMode && <View>Guest Mode: Browse only</View>}
-    </View>
+    <HomeScreen
+      userPhone={loggedInUser || undefined}
+      isGuest={guestMode}
+      onNavigate={(section) => console.log("Navigate to", section)}
+      onLogout={() => {
+        setLoggedInUser(null);
+        setGuestMode(false);
+        setConfirmedLanguage(null); // optionally reset to language selector on logout
+      }}
+    />
   );
 }
