@@ -21,6 +21,7 @@ import { Ionicons, Feather, MaterialCommunityIcons, FontAwesome } from "@expo/ve
 interface HomeScreenProps {
   userPhone?: string;
   isGuest?: boolean;
+  personalId?: string | null;
   onNavigate: (section: string) => void;
   onLogout?: () => void;
 }
@@ -34,37 +35,22 @@ type TripItem = {
   travelerType: "indian" | "international";
 };
 
+// ...imports unchanged
 export default function HomeScreen({
   userPhone,
   isGuest = false,
+  personalId,
   onNavigate,
   onLogout,
 }: HomeScreenProps) {
-  const [personalId, setPersonalId] = useState<string | null>(null);
-  const [fullName, setFullName] = useState<string | null>(null);
-  const [mobile, setMobile] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-
+  // Remove unneeded PID-related state - only tile logic needed
   const [tripDraft, setTripDraft] = useState<any>(null);
   const [trips, setTrips] = useState<TripItem[]>([]);
   const [showTrips, setShowTrips] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const s = await getSession();
-      const pid = await getUserItem("pid_personal_id", s);
-      const name = await getUserItem("pid_full_name", s);
-      const mob = await getUserItem("pid_mobile", s);
-      const mail = await getUserItem("pid_email", s);
-
-      setPersonalId(pid);
-      setFullName(name);
-      setMobile(mob);
-      setEmail(mail);
-
-      const d = readTripDraft();
-      if (d && (d.endDate || d.destination || d.itinerary || d.mode)) setTripDraft(d);
-    })();
+    const d = readTripDraft();
+    if (d && (d.endDate || d.destination || d.itinerary || d.mode)) setTripDraft(d);
   }, []);
 
   useEffect(() => {
@@ -85,15 +71,18 @@ export default function HomeScreen({
     leaderboard: <FontAwesome name="trophy" size={24} color="#fff" />,
   };
 
+  const hasPid = !!personalId;
   const sections = [
     {
       id: "personal-id",
-      title: "Create Personal ID",
-      description: "Verify your identity for secure travel",
+      title: hasPid ? "View Personal ID" : "Create Personal ID",
+      description: hasPid
+        ? "Show and share your secure digital personal ID"
+        : "Verify your identity for secure travel",
       icon: "personal-id",
       status: isGuest ? "disabled" : "available",
       color: "#246BFD",
-      badge: isGuest ? null : "Required",
+      badge: hasPid ? null : isGuest ? null : "Required",
     },
     {
       id: "plan-journey",
@@ -133,14 +122,7 @@ export default function HomeScreen({
     },
   ];
 
-  const hasPid = Boolean(personalId);
-  const visibleSections = hasPid ? sections.filter((sx) => sx.id !== "personal-id") : sections;
-
-  const resumeTrip = () => onNavigate("plan-journey");
-  const clearTrip = () => {
-    clearTripDraft();
-    setTripDraft(null);
-  };
+  const visibleSections = sections;
 
   const active = trips.filter((t) => t.status === "active");
   const upcoming = trips.filter((t) => t.status === "scheduled");
@@ -148,27 +130,7 @@ export default function HomeScreen({
 
   const handleSectionClick = (id: string, status: string) => {
     if (status === "disabled") return;
-    if (id === "personal-id") {
-      if (personalId) onNavigate("personal-id-details");
-      else onNavigate("personal-id");
-      return;
-    }
     onNavigate(id);
-  };
-
-  const copy = async (value?: string | null) => {
-    if (!value) return;
-    if (Platform.OS === "web") {
-      try {
-        await navigator.clipboard.writeText(value);
-        alert("Copied!");
-      } catch {}
-    } else {
-      // Use expo-clipboard in real app
-      try {
-        alert("Copied! (add Clipboard support here)");
-      } catch {}
-    }
   };
 
   return (
@@ -180,6 +142,7 @@ export default function HomeScreen({
             {isGuest ? "Guest Mode" : `Welcome, +91 ${userPhone}`}
           </Text>
         </View>
+        {/* ...rest of your header, trips, etc */}
         <View style={styles.iconRow}>
           {!isGuest && (
             <TouchableOpacity onPress={() => setShowTrips(true)} style={styles.headerBtn}>
@@ -206,7 +169,6 @@ export default function HomeScreen({
           </TouchableOpacity>
         </View>
       </View>
-
       {isGuest && (
         <View style={styles.guestBanner}>
           <Text style={styles.guestText}>
@@ -214,135 +176,54 @@ export default function HomeScreen({
           </Text>
         </View>
       )}
-
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 100 }}>
-        {hasPid && (
-          <Card style={{ marginBottom: 24 }}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Digital Personal ID</Text>
-              <Badge variant="secondary" style={styles.badgeVerified}>
-                <Feather name="check-circle" size={16} color="#22c55e" />
-                <Text style={styles.verifiedText}>Verified</Text>
-              </Badge>
-            </View>
-            <View style={styles.infoGrid}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Personal ID</Text>
-                <View style={styles.infoValueRow}>
-                  <Text style={styles.infoValue}>{personalId}</Text>
-                  <TouchableOpacity onPress={() => copy(personalId)}>
-                    <Feather name="copy" size={16} color="#246BFD" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Name</Text>
-                <Text style={styles.infoValue}>{fullName || "—"}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Mobile</Text>
-                <Text style={styles.infoValue}>{mobile || userPhone || "—"}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>{email || "—"}</Text>
-              </View>
-            </View>
-            <View style={styles.buttonRow}>
-              <Button variant="outline" onPress={() => onNavigate("verify-identity")}>
-                Show QR
-              </Button>
-              <Button variant="secondary" onPress={() => onNavigate("personal-id-details")}>
-                View details
-              </Button>
-            </View>
-          </Card>
-        )}
-
+        {/* Only show the list of sections/tiles */}
+        
         <View>
           <Text style={styles.sectionTitle}>Travel Safety Hub</Text>
-          {visibleSections.map((section) => {
-            return (
-              <TouchableOpacity
-                key={section.id}
-                style={[
-                  styles.sectionCard,
-                  { backgroundColor: "#fff" },
-                  section.status === "disabled" && styles.disabledCard,
-                ]}
-                onPress={() => handleSectionClick(section.id, section.status)}
-                disabled={section.status === "disabled"}
-              >
-                <View style={styles.sectionInnerRow}>
-                  <View style={[styles.iconBox, { backgroundColor: section.color }]}>
-                    {sectionIcons[section.icon]}
-                  </View>
-                  <View style={styles.sectionTextContainer}>
-                    <View style={styles.sectionTitleRow}>
-                      <Text style={styles.sectionTitleText}>{section.title}</Text>
-                      {section.badge && <Badge variant="secondary">{section.badge}</Badge>}
-                      {section.status === "disabled" && (
-                        <Badge variant="destructive">Login Required</Badge>
-                      )}
-                      {section.status === "limited" && (
-                        <Badge variant="outline">Limited Access</Badge>
-                      )}
-                      {section.status === "view-only" && (
-                        <Badge variant="outline">View Only</Badge>
-                      )}
-                    </View>
-                    <Text style={styles.sectionDescription}>{section.description}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={24} color="#6b7280" />
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <Card style={{ marginTop: 24, marginBottom: 64 }}>
-          <Text style={styles.tipTitle}>Safety Tip of the Day</Text>
-          <Text style={styles.tipText}>
-            [translate:Always inform a trusted contact about your travel plans and expected return time.]
-          </Text>
-        </Card>
-      </ScrollView>
-
-      {/* Trips "Dialog" */}
-      <Modal visible={showTrips} animationType="fade" transparent onRequestClose={() => setShowTrips(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={{ fontWeight: "700", fontSize: 17, marginBottom: 12 }}>Your trips</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
-              {[...active, ...upcoming].map((t) => (
-                <View key={t.tid} style={styles.tripItem}>
-                  <View style={styles.tripItemHeader}>
-                    <Text style={styles.tripItemTitle}>{t.destination || "Undisclosed"}</Text>
-                    <Badge variant={t.status === "active" ? "secondary" : "outline"}>
-                      {t.status}
-                    </Badge>
-                  </View>
-                  <Text style={styles.tripItemDetails}>
-                    {t.startDate} → {t.endDate} • {t.travelerType.toUpperCase()}
-                  </Text>
-                  <Text style={styles.tripId}>TID: {t.tid}</Text>
-                </View>
-              ))}
-              {active.length === 0 && upcoming.length === 0 && (
-                <Text style={styles.noTripText}>No active or upcoming trips.</Text>
-              )}
-            </ScrollView>
-            <Button
-              onPress={() => setShowTrips(false)}
-              variant="secondary"
+          {visibleSections.map((section) => (
+            <TouchableOpacity
+              key={section.id}
+              style={[
+                styles.sectionCard,
+                { backgroundColor: "#fff" },
+                section.status === "disabled" && styles.disabledCard,
+              ]}
+              onPress={() => handleSectionClick(section.id, section.status)}
+              disabled={section.status === "disabled"}
             >
-              Close
-            </Button>
-          </View>
+              <View style={styles.sectionInnerRow}>
+                <View style={[styles.iconBox, { backgroundColor: section.color }]}>
+                  {sectionIcons[section.icon]}
+                </View>
+                <View style={styles.sectionTextContainer}>
+                  <View style={styles.sectionTitleRow}>
+                    <Text style={styles.sectionTitleText}>{section.title}</Text>
+                    {section.badge && <Badge variant="secondary">{section.badge}</Badge>}
+                    {section.status === "disabled" && (
+                      <Badge variant="destructive">Login Required</Badge>
+                    )}
+                    {section.status === "limited" && (
+                      <Badge variant="outline">Limited Access</Badge>
+                    )}
+                    {section.status === "view-only" && (
+                      <Badge variant="outline">View Only</Badge>
+                    )}
+                  </View>
+                  <Text style={styles.sectionDescription}>{section.description}</Text>
+                </View>
+                <Feather name="chevron-right" size={24} color="#6b7280" />
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
-      </Modal>
+        {/* ...your tip section, dialog, etc */}
+      </ScrollView>
+      {/* ...your trips modal etc */}
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#f9fafb" },

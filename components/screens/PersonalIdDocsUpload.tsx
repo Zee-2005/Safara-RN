@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
@@ -11,52 +11,48 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Props {
   applicationId: string;
+  userId: string;
   onBack: () => void;
   onDone: () => void; // proceed to next step/summary
 }
 
-export default function PersonalIdDocsUpload({ applicationId, onBack, onDone }: Props) {
+export default function PersonalIdDocsUpload({ applicationId, userId, onBack, onDone }: Props) {
   const [file, setFile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-const pickFile = async () => {
-  try {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['application/pdf', 'image/jpeg', 'image/png'],
-      copyToCacheDirectory: true,
-    });
-
-    let picked: any = null;
-    if ('assets' in result && result.assets && result.assets[0]) {
-      picked = result.assets[0];
-    } else if ('type' in result && result.type === "success") {
-      picked = result;
-    }
-
-    if (picked) {
-      let { name, uri, mimeType } = picked;
-      let type = mimeType;
-      if (!type) {
-        if (name?.endsWith(".jpg") || name?.endsWith(".jpeg")) type = "image/jpeg";
-        else if (name?.endsWith(".png")) type = "image/png";
-        else if (name?.endsWith(".pdf")) type = "application/pdf";
-        else type = "application/octet-stream";
-      }
-      setFile({
-        name,
-        uri,
-        type
+  const pickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png'],
+        copyToCacheDirectory: true,
       });
-    } else {
+
+      let picked: any = null;
+      if ('assets' in result && result.assets && result.assets[0]) {
+        picked = result.assets[0];
+      } else if ('type' in result && result.type === "success") {
+        picked = result;
+      }
+
+      if (picked) {
+        let { name, uri, mimeType } = picked;
+        let type = mimeType;
+        if (!type) {
+          if (name?.endsWith(".jpg") || name?.endsWith(".jpeg")) type = "image/jpeg";
+          else if (name?.endsWith(".png")) type = "image/png";
+          else if (name?.endsWith(".pdf")) type = "application/pdf";
+          else type = "application/octet-stream";
+        }
+        setFile({ name, uri, type });
+      } else {
+        setFile(null);
+      }
+    } catch (e) {
+      setError("Failed to pick file");
       setFile(null);
     }
-  } catch (e) {
-    setError("Failed to pick file");
-    setFile(null);
-  }
-};
-
+  };
 
   const submit = async () => {
     if (!file) return;
@@ -74,10 +70,13 @@ const pickFile = async () => {
         return;
       }
       const final = await finalizePersonalId(applicationId);
-      await AsyncStorage.setItem('pid_personal_id', final.personalId);
-      await AsyncStorage.setItem('pid_full_name', final.name || '');
-      await AsyncStorage.setItem('pid_mobile', final.mobile || '');
-      await AsyncStorage.setItem('pid_email', final.email || '');
+
+      // --- User-specific key storage
+      await AsyncStorage.setItem(`pid_personal_id:${userId}`, final.personalId);
+      await AsyncStorage.setItem(`pid_full_name:${userId}`, final.name || '');
+      await AsyncStorage.setItem(`pid_mobile:${userId}`, final.mobile || '');
+      await AsyncStorage.setItem(`pid_email:${userId}`, final.email || '');
+
       alert(`Digital Personal ID created: ${final.personalId}`);
       onDone();
     } catch (e: any) {
@@ -124,6 +123,7 @@ const pickFile = async () => {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   header: {

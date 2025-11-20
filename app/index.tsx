@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import LanguageSelector from "../components/screens/LanguageSelector";
 import AuthScreen from "../components/screens/AuthScreen";
 import HomeScreen from "../components/screens/HomeScreen";
 import PersonalIdCreation from "../components/screens/PersonalIdCreation";
 import PersonalIdDocsUpload from "../components/screens/PersonalIdDocsUpload";
 import PersonalIdDetails from "../components/screens/PersonalIdDetails";
+import PersonalIdDetailsModal from "../components/screens/PersonalIdDetailsModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -12,25 +14,29 @@ export default function Index() {
   const [loggedInUser, setLoggedInUser] = useState<string | null>(null);
   const [guestMode, setGuestMode] = useState(false);
 
+  // Holds user's PID for this session
+  const [personalId, setPersonalId] = useState<string | null>(null);
   // Personal ID flow states
   const [pidStep, setPidStep] = useState<null | "create" | "docs" | "details">(null);
-  const [creationData, setCreationData] = useState<any>(null);
-
-  // For final docs stage
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [showPersonalIdModal, setShowPersonalIdModal] = useState(false);
+  const [personalIdInfo, setPersonalIdInfo] = useState<{pid: string | null; name: string | null; email: string | null; mobile: string | null}>({
+    pid: null, name: null, email: null, mobile: null
+  });
 
-  // For demo, QR mode: show popover/modal or just a flag
-  const [showQr, setShowQr] = useState(false);
+  useEffect(() => {
+    if (!loggedInUser) setPersonalId(null);
+    else {
+      AsyncStorage.getItem(`pid_personal_id:${loggedInUser}`).then(pid => setPersonalId(pid));
+    }
+  }, [loggedInUser, pidStep]); // reload on login/PID flow step change
 
   if (!confirmedLanguage) {
     return (
       <LanguageSelector
         selectedLanguage={selectedLanguage}
         onLanguageSelect={setSelectedLanguage}
-        onContinue={() => {
-          if (selectedLanguage) setConfirmedLanguage(selectedLanguage);
-          else alert("Please select a language before continuing.");
-        }}
+        onContinue={() => setConfirmedLanguage(selectedLanguage)}
       />
     );
   }
@@ -39,12 +45,11 @@ export default function Index() {
     return <AuthScreen onLogin={setLoggedInUser} onGuestMode={() => setGuestMode(true)} />;
   }
 
-  // 1st stage: Personal ID creation
+  // 1st stage: PID creation
   if (pidStep === "create") {
     return (
       <PersonalIdCreation
         onComplete={data => {
-          setCreationData(data);
           setApplicationId(data.applicationId);
           setPidStep("docs");
         }}
@@ -53,42 +58,72 @@ export default function Index() {
     );
   }
 
-  // 2nd stage: Docs upload
-  if (pidStep === "docs" && applicationId) {
+  // 2nd: Docs upload
+  if (pidStep === "docs" && applicationId && loggedInUser) {
     return (
       <PersonalIdDocsUpload
         applicationId={applicationId}
+        userId={loggedInUser}  // Pass user ID here!
         onBack={() => setPidStep("create")}
-        onDone={() => setPidStep("details")}
+        onDone={async () => {
+          // After docs, refresh PID for this user:
+          const pid = await AsyncStorage.getItem(`pid_personal_id:${loggedInUser}`);
+          setPersonalId(pid);
+          setPidStep("details");
+        }}
       />
     );
   }
 
-  // 3rd stage: Show personal ID details
+  // 3rd: PID details
   if (pidStep === "details") {
     return (
-      <PersonalIdDetails
-        onBack={() => setPidStep(null)}
-        onShowQr={() => setShowQr(true)}
-      />
-      // For showQr: launch a Modal with your QR code, then setShowQr(false) to dismiss
+      <PersonalIdDetails onBack={() => setPidStep(null)} onShowQr={() => { /* show QR logic */ }} />
     );
   }
+
+  const handleShowPersonalIdDetails = async () => {
+    if (!loggedInUser) return;
+    const pid = await AsyncStorage.getItem(`pid_personal_id:${loggedInUser}`);
+    const name = await AsyncStorage.getItem(`pid_full_name:${loggedInUser}`);
+    const email = await AsyncStorage.getItem(`pid_email:${loggedInUser}`);
+    const mobile = await AsyncStorage.getItem(`pid_mobile:${loggedInUser}`);
+    setPersonalIdInfo({ pid, name, email, mobile });
+    setShowPersonalIdModal(true);
+  };
 
   // HomeScreen default
   return (
-    <HomeScreen
-      userPhone={loggedInUser || undefined}
-      isGuest={guestMode}
-      onNavigate={section => {
-        if (section === "personal-id") setPidStep("create");
-        // ... add more as you route other tiles
-      }}
-      onLogout={() => {
-        setLoggedInUser(null);
-        setGuestMode(false);
-        setConfirmedLanguage(null);
-      }}
-    />
+   
+    <>
+      <HomeScreen
+        userPhone={loggedInUser || undefined}
+        isGuest={guestMode}
+        personalId={personalId}
+        onNavigate={section => {
+          if (section === "personal-id" && personalId) {
+            handleShowPersonalIdDetails(); // Show modal
+          } else if (section === "personal-id") {
+            setPidStep("create"); // Creation
+          }
+          // ...others
+        }}
+        onLogout={() => {
+          setLoggedInUser(null);
+          setGuestMode(false);
+          setConfirmedLanguage(null);
+          setPersonalId(null);
+        }}
+      />
+      {/* PID Details Modal */}
+      <PersonalIdDetailsModal
+        visible={showPersonalIdModal}
+        onClose={() => setShowPersonalIdModal(false)}
+        pid={personalIdInfo.pid}
+        name={personalIdInfo.name}
+        email={personalIdInfo.email}
+        mobile={personalIdInfo.mobile}
+      />
+    </>
   );
 }
