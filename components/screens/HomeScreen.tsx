@@ -15,7 +15,6 @@ import Badge from "../ui/Badge";
 import { getSession, getUserItem } from "../../lib/session";
 import { readTripDraft, clearTripDraft } from "../../lib/trip";
 import { getMyTrips } from "../../lib/tourist.service";
-// Use @expo/vector-icons
 import { Ionicons, Feather, MaterialCommunityIcons, FontAwesome } from "@expo/vector-icons";
 
 interface HomeScreenProps {

@@ -5,7 +5,6 @@ import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 import Label from "../ui/Label";
-// Replace these below with your real auth utility imports
 import { loginEmail, signup, requestOtp, verifyOtp } from "../../lib/auth";
 
 type AuthMode = "login" | "signup";
@@ -26,7 +25,6 @@ export default function AuthScreen({ onLogin, onGuestMode }: AuthScreenProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [reqId, setReqId] = useState<string | null>(null);
 
-  // Tabs alternative
   function Tabs() {
     return (
       <View style={styles.tabsList}>
