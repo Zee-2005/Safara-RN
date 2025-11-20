@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity, Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
@@ -20,20 +20,43 @@ export default function PersonalIdDocsUpload({ applicationId, onBack, onDone }: 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pickFile = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/jpeg', 'image/png'],
-        copyToCacheDirectory: true,
-      });
-      // DocumentPicker result typings may not include `type`; guard by checking `uri`
-      if ('uri' in result && result.uri) {
-        setFile(result);
-      }
-    } catch (e) {
-      setError("Failed to pick file");
+const pickFile = async () => {
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/jpeg', 'image/png'],
+      copyToCacheDirectory: true,
+    });
+
+    let picked: any = null;
+    if ('assets' in result && result.assets && result.assets[0]) {
+      picked = result.assets[0];
+    } else if ('type' in result && result.type === "success") {
+      picked = result;
     }
-  };
+
+    if (picked) {
+      let { name, uri, mimeType } = picked;
+      let type = mimeType;
+      if (!type) {
+        if (name?.endsWith(".jpg") || name?.endsWith(".jpeg")) type = "image/jpeg";
+        else if (name?.endsWith(".png")) type = "image/png";
+        else if (name?.endsWith(".pdf")) type = "application/pdf";
+        else type = "application/octet-stream";
+      }
+      setFile({
+        name,
+        uri,
+        type
+      });
+    } else {
+      setFile(null);
+    }
+  } catch (e) {
+    setError("Failed to pick file");
+    setFile(null);
+  }
+};
+
 
   const submit = async () => {
     if (!file) return;
@@ -43,7 +66,7 @@ export default function PersonalIdDocsUpload({ applicationId, onBack, onDone }: 
       await uploadAadhaarDoc(applicationId, {
         uri: file.uri,
         name: file.name,
-        type: file.mimeType || "application/octet-stream"
+        type: file.type
       });
       const verify = await verifyAadhaarServer(applicationId);
       if (!verify.documentVerified) {
@@ -82,7 +105,7 @@ export default function PersonalIdDocsUpload({ applicationId, onBack, onDone }: 
               Choose File
             </Button>
             {file && (
-              <View style={{ marginTop: 10 }}>
+              <View style={{ marginTop: 10, flexDirection: "row", alignItems: "center" }}>
                 <Feather name="check-circle" size={20} color="#22c55e" />
                 <Text style={{ fontSize: 13, marginLeft: 4 }}>{file.name}</Text>
               </View>
@@ -106,7 +129,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
     borderBottomWidth: 1,
     borderColor: "#e5e7eb",
     padding: 16

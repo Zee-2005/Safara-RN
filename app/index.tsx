@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { View, Text } from "react-native";
 import LanguageSelector from "../components/screens/LanguageSelector";
 import AuthScreen from "../components/screens/AuthScreen";
 import HomeScreen from "../components/screens/HomeScreen";
 import PersonalIdCreation from "../components/screens/PersonalIdCreation";
+import PersonalIdDocsUpload from "../components/screens/PersonalIdDocsUpload";
+import PersonalIdDetails from "../components/screens/PersonalIdDetails";
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -11,11 +12,16 @@ export default function Index() {
   const [loggedInUser, setLoggedInUser] = useState<string | null>(null);
   const [guestMode, setGuestMode] = useState(false);
 
-  // NEW: controls Home/PersonalIdCreation flow after login
-  const [showPersonalIdFlow, setShowPersonalIdFlow] = useState(false);
+  // Personal ID flow states
+  const [pidStep, setPidStep] = useState<null | "create" | "docs" | "details">(null);
   const [creationData, setCreationData] = useState<any>(null);
 
-  // Step 1: Language selection
+  // For final docs stage
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+
+  // For demo, QR mode: show popover/modal or just a flag
+  const [showQr, setShowQr] = useState(false);
+
   if (!confirmedLanguage) {
     return (
       <LanguageSelector
@@ -29,37 +35,54 @@ export default function Index() {
     );
   }
 
-  // Step 2: Auth/login
   if (!loggedInUser && !guestMode) {
     return <AuthScreen onLogin={setLoggedInUser} onGuestMode={() => setGuestMode(true)} />;
   }
 
-  // Step 3: Personal ID Creation flow (from HomeScreen "Create Personal ID" tab)
-  if (showPersonalIdFlow) {
+  // 1st stage: Personal ID creation
+  if (pidStep === "create") {
     return (
       <PersonalIdCreation
         onComplete={data => {
           setCreationData(data);
-          setShowPersonalIdFlow(false);
+          setApplicationId(data.applicationId);
+          setPidStep("docs");
         }}
-        onBack={() => setShowPersonalIdFlow(false)}
+        onBack={() => setPidStep(null)}
       />
     );
   }
 
-  // Step 4: HomeScreen default
+  // 2nd stage: Docs upload
+  if (pidStep === "docs" && applicationId) {
+    return (
+      <PersonalIdDocsUpload
+        applicationId={applicationId}
+        onBack={() => setPidStep("create")}
+        onDone={() => setPidStep("details")}
+      />
+    );
+  }
+
+  // 3rd stage: Show personal ID details
+  if (pidStep === "details") {
+    return (
+      <PersonalIdDetails
+        onBack={() => setPidStep(null)}
+        onShowQr={() => setShowQr(true)}
+      />
+      // For showQr: launch a Modal with your QR code, then setShowQr(false) to dismiss
+    );
+  }
+
+  // HomeScreen default
   return (
     <HomeScreen
       userPhone={loggedInUser || undefined}
       isGuest={guestMode}
-      // When user selects a tile/tab:
       onNavigate={section => {
-        if (section === "personal-id") {
-          setShowPersonalIdFlow(true);
-        } else {
-          // handle other sections/routes here
-          console.log("Navigate to", section);
-        }
+        if (section === "personal-id") setPidStep("create");
+        // ... add more as you route other tiles
       }}
       onLogout={() => {
         setLoggedInUser(null);
