@@ -2,14 +2,26 @@ import React from "react";
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
-export default function PersonalIdDetailsModal({ visible, onClose, pid, name, email, mobile }: {
+function formatDob(dobString: string | number | Date): string {
+  if (dobString === undefined || dobString === null || dobString === "") return "";
+  // e.g. 2000-12-11 -> 11 Dec 2000
+  const d = new Date(dobString);
+  if (isNaN(+d)) return String(dobString);
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+
+export default function PersonalIdDetailsModal({ visible, onClose, pid, name, email, mobile,dob }: {
   visible: boolean,
   onClose: () => void,
   pid: string | null,
   name: string | null,
   email: string | null,
-  mobile: string | null
-}) {
+  mobile: string | null,
+  dob: string | null,
+})
+
+{
   return (
     <Modal
       visible={visible}
@@ -45,6 +57,11 @@ export default function PersonalIdDetailsModal({ visible, onClose, pid, name, em
               <Text style={styles.label}>Email</Text>
               <Text style={styles.value}>{email || "—"}</Text>
             </View>
+            <View style={styles.fieldWrap}>
+  <Text style={styles.label}>Date of Birth</Text>
+  <Text style={styles.value}>{dob ? formatDob(dob) : "—"}</Text>
+</View>
+
           </ScrollView>
         </View>
       </View>

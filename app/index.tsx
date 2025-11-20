@@ -7,6 +7,7 @@ import PersonalIdDocsUpload from "../components/screens/PersonalIdDocsUpload";
 import PersonalIdDetails from "../components/screens/PersonalIdDetails";
 import PersonalIdDetailsModal from "../components/screens/PersonalIdDetailsModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import PersonalSafety from "../components/screens/Personalsafety";
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -20,9 +21,12 @@ export default function Index() {
   const [pidStep, setPidStep] = useState<null | "create" | "docs" | "details">(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [showPersonalIdModal, setShowPersonalIdModal] = useState(false);
-  const [personalIdInfo, setPersonalIdInfo] = useState<{pid: string | null; name: string | null; email: string | null; mobile: string | null}>({
-    pid: null, name: null, email: null, mobile: null
-  });
+  const [personalIdInfo, setPersonalIdInfo] = useState<{pid: string | null; name: string | null; email: string | null; mobile: string | null; dob: string | null}>({
+  pid: null, name: null, email: null, mobile: null, dob: null
+});
+
+  const [safetyActive, setSafetyActive] = useState(false);
+
 
   useEffect(() => {
     if (!loggedInUser) setPersonalId(null);
@@ -81,6 +85,14 @@ export default function Index() {
       <PersonalIdDetails onBack={() => setPidStep(null)} onShowQr={() => { /* show QR logic */ }} />
     );
   }
+  if (safetyActive) {
+    return (
+      <PersonalSafety
+        isGuest={guestMode}
+        onBack={() => setSafetyActive(false)}
+      />
+    );
+  }
 
   const handleShowPersonalIdDetails = async () => {
     if (!loggedInUser) return;
@@ -88,7 +100,8 @@ export default function Index() {
     const name = await AsyncStorage.getItem(`pid_full_name:${loggedInUser}`);
     const email = await AsyncStorage.getItem(`pid_email:${loggedInUser}`);
     const mobile = await AsyncStorage.getItem(`pid_mobile:${loggedInUser}`);
-    setPersonalIdInfo({ pid, name, email, mobile });
+    const dob = await AsyncStorage.getItem(`pid_dob:${loggedInUser}`);
+  setPersonalIdInfo({ pid, name, email, mobile, dob });
     setShowPersonalIdModal(true);
   };
 
@@ -105,7 +118,9 @@ export default function Index() {
             handleShowPersonalIdDetails(); // Show modal
           } else if (section === "personal-id") {
             setPidStep("create"); // Creation
-          }
+          } else if (section === "personal-safety") {
+          setSafetyActive(true);
+        }
           // ...others
         }}
         onLogout={() => {
@@ -123,6 +138,7 @@ export default function Index() {
         name={personalIdInfo.name}
         email={personalIdInfo.email}
         mobile={personalIdInfo.mobile}
+        dob={personalIdInfo.dob}
       />
     </>
   );

@@ -70,12 +70,13 @@ export default function PersonalIdDocsUpload({ applicationId, userId, onBack, on
         return;
       }
       const final = await finalizePersonalId(applicationId);
-
+      console.log('Finalize payload:', final);
       // --- User-specific key storage
       await AsyncStorage.setItem(`pid_personal_id:${userId}`, final.personalId);
       await AsyncStorage.setItem(`pid_full_name:${userId}`, final.name || '');
       await AsyncStorage.setItem(`pid_mobile:${userId}`, final.mobile || '');
       await AsyncStorage.setItem(`pid_email:${userId}`, final.email || '');
+      await AsyncStorage.setItem(`pid_dob:${userId}`, final.dob || '');  
 
       alert(`Digital Personal ID created: ${final.personalId}`);
       onDone();

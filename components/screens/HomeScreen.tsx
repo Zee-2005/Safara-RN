@@ -139,7 +139,7 @@ export default function HomeScreen({
         <View>
           <Text style={styles.title}>SaFara</Text>
           <Text style={styles.subtitle}>
-            {isGuest ? "Guest Mode" : `Welcome, +91 ${userPhone}`}
+            {isGuest ? "Guest Mode" : `Welcome, ${userPhone}`}
           </Text>
         </View>
         {/* ...rest of your header, trips, etc */}
