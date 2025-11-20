@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import LanguageSelector from "../components/screens/LanguageSelector";
 import AuthScreen from "../components/screens/AuthScreen";
 import HomeScreen from "../components/screens/HomeScreen";
@@ -9,6 +10,8 @@ import PersonalIdDetailsModal from "../components/screens/PersonalIdDetailsModal
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PersonalSafety from "../components/screens/Personalsafety";
 import { fetchAndSyncPersonalIdByEmail } from "../services/personalId"; // Adjust path as needed
+import PlanTripHub from "../components/screens/PlanTripHub"; // <--- Add the import
+import AgencyBrowse from "../components/screens/AgencyBrowse"; // <--- Add the import
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -33,6 +36,10 @@ export default function Index() {
   });
 
   const [safetyActive, setSafetyActive] = useState(false);
+  const [planTripActive, setPlanTripActive] = useState(false);
+  const [agencyBrowseActive, setAgencyBrowseActive] = useState(false);
+// For demo, add this too:
+const [touristIdGenerateActive, setTouristIdGenerateActive] = useState(false);
 
   // Always fetch PID from backend after (re)login
   useEffect(() => {
@@ -123,6 +130,40 @@ export default function Index() {
     );
   }
 
+  if (agencyBrowseActive && userEmail) {
+  return (
+    <AgencyBrowse
+      userEmail={userEmail}
+      onBack={() => setAgencyBrowseActive(false)}
+      onProceed={() => {
+        setAgencyBrowseActive(false);
+        setTouristIdGenerateActive(true); // <-- Next screen in trip plan process
+      }}
+    />
+  );
+}
+
+  if (planTripActive) {
+    return (
+      <PlanTripHub
+        onBack={() => setPlanTripActive(false)}
+        onNavigate={section => {
+          if (section === "agencies") {
+            // Navigate to agencies (add screen and state when ready)
+            setAgencyBrowseActive(true);
+          } else if (section === "direct") {
+            // setDirectIdActive(true);
+          } else if (section === "ai") {
+            // Do nothing or show "coming soon"
+          }
+        }}
+      />
+    );
+  }
+
+
+
+
   // Handler to load personalId details for modal
   const handleShowPersonalIdDetails = async () => {
     if (!loggedInUser) return;
@@ -149,6 +190,8 @@ export default function Index() {
             setPidStep("create");
           } else if (section === "personal-safety") {
             setSafetyActive(true);
+          }else if (section === "plan-journey") { 
+            setPlanTripActive(true);
           }
           // ...other navigation as needed
         }}

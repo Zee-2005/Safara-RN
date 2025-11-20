@@ -1,5 +1,6 @@
 // src/lib/trip.ts
-import { getSession, setUserItem, getUserItem, removeUserItem } from '@/lib/session';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 export type TripMode = 'agencies' | 'ai' | 'direct';
 
 export type TripDraft = {
@@ -13,33 +14,58 @@ export type TripDraft = {
   homeCity?: string | null;
 };
 
-const KEYS = ['trip_mode','trip_start_now','trip_start','trip_end','trip_destination','trip_itinerary','trip_agency','trip_home_city'];
+// The keys you'll use in AsyncStorage for each draft field
+const KEYS = [
+  'trip_mode',
+  'trip_start_now',
+  'trip_start',
+  'trip_end',
+  'trip_destination',
+  'trip_itinerary',
+  'trip_agency',
+  'trip_home_city'
+];
 
-export function saveTripDraft(d: TripDraft) {
-  setUserItem('trip_mode', d.mode);
-  setUserItem('trip_start_now', d.startNow ? '1' : '0');
-  setUserItem('trip_start', d.startDate || '');
-  setUserItem('trip_end', d.endDate || '');
-  setUserItem('trip_destination', d.destination || '');
-  setUserItem('trip_itinerary', d.itinerary || '');
-  setUserItem('trip_agency', d.agencyId || '');
-  if (d.homeCity !== undefined) setUserItem('trip_home_city', d.homeCity || '');
+// Save a draft for a user's email
+export async function saveTripDraft(email: string, d: TripDraft) {
+  await AsyncStorage.setItem(`trip_mode:${email}`, d.mode);
+  await AsyncStorage.setItem(`trip_start_now:${email}`, d.startNow ? '1' : '0');
+  await AsyncStorage.setItem(`trip_start:${email}`, d.startDate || '');
+  await AsyncStorage.setItem(`trip_end:${email}`, d.endDate || '');
+  await AsyncStorage.setItem(`trip_destination:${email}`, d.destination || '');
+  await AsyncStorage.setItem(`trip_itinerary:${email}`, d.itinerary || '');
+  await AsyncStorage.setItem(`trip_agency:${email}`, d.agencyId || '');
+  if (d.homeCity !== undefined) {
+    await AsyncStorage.setItem(`trip_home_city:${email}`, d.homeCity || '');
+  }
 }
 
-export function readTripDraft(): TripDraft {
+// Read a draft for a user's email
+export async function readTripDraft(email: string): Promise<TripDraft> {
+  const [
+    mode,
+    startNow,
+    startDate,
+    endDate,
+    destination,
+    itinerary,
+    agencyId,
+    homeCity,
+  ] = await Promise.all(KEYS.map(key => AsyncStorage.getItem(`${key}:${email}`)));
+
   return {
-    mode: (getUserItem('trip_mode') as TripMode) || 'direct',
-    startNow: getUserItem('trip_start_now') === '1',
-    startDate: getUserItem('trip_start') || null,
-    endDate: getUserItem('trip_end') || null,
-    destination: getUserItem('trip_destination') || null,
-    itinerary: getUserItem('trip_itinerary') || null,
-    agencyId: getUserItem('trip_agency') || null,
-    homeCity: getUserItem('trip_home_city') || null,
+    mode: (mode as TripMode) || 'direct',
+    startNow: startNow === '1',
+    startDate: startDate || null,
+    endDate: endDate || null,
+    destination: destination || null,
+    itinerary: itinerary || null,
+    agencyId: agencyId || null,
+    homeCity: homeCity || null,
   };
 }
 
-export function clearTripDraft() {
-  const s = getSession();
-  KEYS.forEach(k => removeUserItem(k, s));
+// Clear a trip draft for a user's email
+export async function clearTripDraft(email: string) {
+  await Promise.all(KEYS.map(key => AsyncStorage.removeItem(`${key}:${email}`)));
 }

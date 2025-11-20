@@ -48,10 +48,12 @@ export default function HomeScreen({
   const [trips, setTrips] = useState<TripItem[]>([]);
   const [showTrips, setShowTrips] = useState(false);
 
-  useEffect(() => {
-    const d = readTripDraft();
-    if (d && (d.endDate || d.destination || d.itinerary || d.mode)) setTripDraft(d);
-  }, []);
+  // const draft = readTripDraft();
+
+  // useEffect(() => {
+  //   const d = readTripDraft();
+  //   if (d && (d.endDate || d.destination || d.itinerary || d.mode)) setTripDraft(d);
+  // }, []);
 
   useEffect(() => {
     if (isGuest) return;
