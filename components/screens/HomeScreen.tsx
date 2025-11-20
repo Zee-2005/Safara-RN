@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   View,
   Text,
@@ -7,7 +8,7 @@ import {
   StyleSheet,
   Platform,
   Modal,
-  TouchableOpacity,
+  TouchableOpacity, 
 } from "react-native";
 import Card from "../ui/Card";
 import Button from "../ui/Button";
@@ -171,7 +172,7 @@ export default function HomeScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={["top", "left", "right"]}>
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>SaFara</Text>
@@ -339,7 +340,7 @@ export default function HomeScreen({
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -3,6 +3,7 @@ import { View, Text } from "react-native";
 import LanguageSelector from "../components/screens/LanguageSelector";
 import AuthScreen from "../components/screens/AuthScreen";
 import HomeScreen from "../components/screens/HomeScreen";
+import PersonalIdCreation from "../components/screens/PersonalIdCreation";
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -10,54 +11,60 @@ export default function Index() {
   const [loggedInUser, setLoggedInUser] = useState<string | null>(null);
   const [guestMode, setGuestMode] = useState(false);
 
-  const onLanguageSelect = (code: string) => {
-    setSelectedLanguage(code);
-  };
+  // NEW: controls Home/PersonalIdCreation flow after login
+  const [showPersonalIdFlow, setShowPersonalIdFlow] = useState(false);
+  const [creationData, setCreationData] = useState<any>(null);
 
-  const onContinue = () => {
-    if (selectedLanguage) {
-      setConfirmedLanguage(selectedLanguage);
-    } else {
-      alert("Please select a language before continuing.");
-    }
-  };
-
-  const onLogin = (user: string) => {
-    setLoggedInUser(user);
-    console.log("Logged in as", user);
-  };
-
-  const onGuestMode = () => {
-    setGuestMode(true);
-    console.log("Guest mode active");
-  };
-
-  // SHOW LanguageSelector if language not confirmed yet
+  // Step 1: Language selection
   if (!confirmedLanguage) {
     return (
       <LanguageSelector
         selectedLanguage={selectedLanguage}
-        onLanguageSelect={onLanguageSelect}
-        onContinue={onContinue}
+        onLanguageSelect={setSelectedLanguage}
+        onContinue={() => {
+          if (selectedLanguage) setConfirmedLanguage(selectedLanguage);
+          else alert("Please select a language before continuing.");
+        }}
       />
     );
   }
 
-  // SHOW AuthScreen if user not logged in and not guest
+  // Step 2: Auth/login
   if (!loggedInUser && !guestMode) {
-    return <AuthScreen onLogin={onLogin} onGuestMode={onGuestMode} />;
+    return <AuthScreen onLogin={setLoggedInUser} onGuestMode={() => setGuestMode(true)} />;
   }
 
-  // SHOW HomeScreen after login or guest
+  // Step 3: Personal ID Creation flow (from HomeScreen "Create Personal ID" tab)
+  if (showPersonalIdFlow) {
+    return (
+      <PersonalIdCreation
+        onComplete={data => {
+          setCreationData(data);
+          setShowPersonalIdFlow(false);
+        }}
+        onBack={() => setShowPersonalIdFlow(false)}
+      />
+    );
+  }
+
+  // Step 4: HomeScreen default
   return (
     <HomeScreen
       userPhone={loggedInUser || undefined}
       isGuest={guestMode}
-      onNavigate={(section) => console.log("Navigate to", section)}
+      // When user selects a tile/tab:
+      onNavigate={section => {
+        if (section === "personal-id") {
+          setShowPersonalIdFlow(true);
+        } else {
+          // handle other sections/routes here
+          console.log("Navigate to", section);
+        }
+      }}
       onLogout={() => {
         setLoggedInUser(null);
         setGuestMode(false);
-        setConfirmedLanguage(null); // optionally reset to language selector on logout
+        setConfirmedLanguage(null);
       }}
     />
   );

@@ -1,17 +1,18 @@
 // src/lib/tourist.service.ts
 import { getSession } from '@/lib/session';
 
-const BASE = '/api/v1/tourist';
+const BASE = 'https://safara-backend.onrender.com//api/v1/tourist';
 
-function authHeaders(): Record<string, string> {
-  const s = getSession();
+async function authHeaders(): Promise<Record<string, string>> {
+  const s = await getSession();
   const h: Record<string, string> = {};
   if (s?.userId) h['x-user-id'] = s.userId;
   return h;
 }
 
-function jsonHeaders(): Record<string, string> {
-  return { 'Content-Type': 'application/json', ...authHeaders() };
+async function jsonHeaders(): Promise<Record<string, string>> {
+  const h = await authHeaders();
+  return { 'Content-Type': 'application/json', ...h };
 }
 
 async function parse(res: Response) {
@@ -26,7 +27,6 @@ async function parse(res: Response) {
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
 }
-
 export async function createTrip(payload: {
   holderPid: string;
   startDate: string;
@@ -39,7 +39,7 @@ export async function createTrip(payload: {
 }) {
   const res = await fetch(`${BASE}/trips`, {
     method: 'POST',
-    headers: jsonHeaders(),
+    headers: await jsonHeaders(),
     body: JSON.stringify(payload),
   });
   return parse(res) as Promise<{
@@ -72,14 +72,14 @@ export async function uploadTripDocs(
 
   const res = await fetch(`${BASE}/trips/${tid}/docs`, {
     method: 'POST',
-    headers: authHeaders(), // do not set Content-Type for FormData
+    headers: await authHeaders(), // do not set Content-Type for FormData
     body: fd,
   });
   return parse(res) as Promise<{ ok: true; tid: string; travelerType: 'indian' | 'international' }>;
 }
 
 export async function getMyTrips() {
-  const res = await fetch(`${BASE}/trips`, { headers: authHeaders() });
+  const res = await fetch(`${BASE}/trips`, { headers: await authHeaders() });
   return parse(res) as Promise<{
     trips: Array<{
       tid: string;
@@ -97,7 +97,7 @@ export async function getMyTrips() {
 }
 
 export async function getTrip(tid: string) {
-  const res = await fetch(`${BASE}/trips/${tid}`, { headers: authHeaders() });
+  const res = await fetch(`${BASE}/trips/${tid}`, { headers: await authHeaders() });
   return parse(res) as Promise<{
     tid: string;
     status: 'active' | 'scheduled' | 'expired';
@@ -111,3 +111,4 @@ export async function getTrip(tid: string) {
     createdAt: string;
   }>;
 }
+

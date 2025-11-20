@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable,KeyboardAvoidingView, Platform } from "react-native";
 import { MaterialCommunityIcons, Feather, Ionicons, FontAwesome } from "@expo/vector-icons";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 import Label from "../ui/Label";
 import { loginEmail, signup, requestOtp, verifyOtp } from "../../lib/auth";
+
 
 type AuthMode = "login" | "signup";
 type Step = "choose" | "phone" | "otp";
