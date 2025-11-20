@@ -1,7 +1,8 @@
 // src/lib/tourist.service.ts
 import { getSession } from '@/lib/session';
 
-const BASE = 'https://safara-backend.onrender.com//api/v1/tourist';
+// const BASE = 'https://safara-backend.onrender.com/api/v1/auth';
+const BASE = 'http://192.168.0.103:3000/api/v1/auth';
 
 async function authHeaders(): Promise<Record<string, string>> {
   const s = await getSession();

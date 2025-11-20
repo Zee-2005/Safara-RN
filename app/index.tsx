@@ -8,32 +8,56 @@ import PersonalIdDetails from "../components/screens/PersonalIdDetails";
 import PersonalIdDetailsModal from "../components/screens/PersonalIdDetailsModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PersonalSafety from "../components/screens/Personalsafety";
+import { fetchAndSyncPersonalIdByEmail } from "../services/personalId"; // Adjust path as needed
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
   const [confirmedLanguage, setConfirmedLanguage] = useState<string | null>(null);
+  // These always represent email!
   const [loggedInUser, setLoggedInUser] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [guestMode, setGuestMode] = useState(false);
 
-  // Holds user's PID for this session
   const [personalId, setPersonalId] = useState<string | null>(null);
-  // Personal ID flow states
   const [pidStep, setPidStep] = useState<null | "create" | "docs" | "details">(null);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [showPersonalIdModal, setShowPersonalIdModal] = useState(false);
-  const [personalIdInfo, setPersonalIdInfo] = useState<{pid: string | null; name: string | null; email: string | null; mobile: string | null; dob: string | null}>({
-  pid: null, name: null, email: null, mobile: null, dob: null
-});
+  const [personalIdInfo, setPersonalIdInfo] = useState<{
+    pid: string | null;
+    name: string | null;
+    email: string | null;
+    mobile: string | null;
+    dob: string | null;
+  }>({
+    pid: null, name: null, email: null, mobile: null, dob: null
+  });
 
   const [safetyActive, setSafetyActive] = useState(false);
 
+  // Always fetch PID from backend after (re)login
+  useEffect(() => {
+    if (userEmail) {
+      fetchAndSyncPersonalIdByEmail(userEmail).then(pidData => {
+        if (pidData) setPersonalId(pidData.personalId);
+        else setPersonalId(null);
+      });
+    }
+  }, [userEmail]);
 
+  // Always load PID from AsyncStorage when login changes (backup for manual local writes)
   useEffect(() => {
     if (!loggedInUser) setPersonalId(null);
     else {
       AsyncStorage.getItem(`pid_personal_id:${loggedInUser}`).then(pid => setPersonalId(pid));
     }
-  }, [loggedInUser, pidStep]); // reload on login/PID flow step change
+  }, [loggedInUser, pidStep]);
+
+  // Called on login from Auth screen
+  function handleLogin(phoneOrEmail: string) {
+    setUserEmail(phoneOrEmail);
+    setLoggedInUser(phoneOrEmail);
+    // fetchAndSyncPersonalIdByEmail(phoneOrEmail) will run by useEffect
+  }
 
   if (!confirmedLanguage) {
     return (
@@ -46,10 +70,10 @@ export default function Index() {
   }
 
   if (!loggedInUser && !guestMode) {
-    return <AuthScreen onLogin={setLoggedInUser} onGuestMode={() => setGuestMode(true)} />;
+    return <AuthScreen onLogin={handleLogin} onGuestMode={() => setGuestMode(true)} />;
   }
 
-  // 1st stage: PID creation
+  // 1st: Personal ID creation
   if (pidStep === "create") {
     return (
       <PersonalIdCreation
@@ -67,10 +91,10 @@ export default function Index() {
     return (
       <PersonalIdDocsUpload
         applicationId={applicationId}
-        userId={loggedInUser}  // Pass user ID here!
+        userId={loggedInUser}
         onBack={() => setPidStep("create")}
         onDone={async () => {
-          // After docs, refresh PID for this user:
+          // Refresh PID after docs creation/finalization
           const pid = await AsyncStorage.getItem(`pid_personal_id:${loggedInUser}`);
           setPersonalId(pid);
           setPidStep("details");
@@ -79,12 +103,17 @@ export default function Index() {
     );
   }
 
-  // 3rd: PID details
+  // 3rd: PID details (not usually visible; PID now auto-shown in Modal)
   if (pidStep === "details") {
     return (
-      <PersonalIdDetails onBack={() => setPidStep(null)} onShowQr={() => { /* show QR logic */ }} />
+      <PersonalIdDetails
+        onBack={() => setPidStep(null)}
+        onShowQr={() => { /* QR logic if needed */ }}
+      />
     );
   }
+
+  // 4th: Personal Safety Feature
   if (safetyActive) {
     return (
       <PersonalSafety
@@ -94,6 +123,7 @@ export default function Index() {
     );
   }
 
+  // Handler to load personalId details for modal
   const handleShowPersonalIdDetails = async () => {
     if (!loggedInUser) return;
     const pid = await AsyncStorage.getItem(`pid_personal_id:${loggedInUser}`);
@@ -101,13 +131,12 @@ export default function Index() {
     const email = await AsyncStorage.getItem(`pid_email:${loggedInUser}`);
     const mobile = await AsyncStorage.getItem(`pid_mobile:${loggedInUser}`);
     const dob = await AsyncStorage.getItem(`pid_dob:${loggedInUser}`);
-  setPersonalIdInfo({ pid, name, email, mobile, dob });
+    setPersonalIdInfo({ pid, name, email, mobile, dob });
     setShowPersonalIdModal(true);
   };
 
-  // HomeScreen default
+  // HomeScreen default + Modal
   return (
-   
     <>
       <HomeScreen
         userPhone={loggedInUser || undefined}
@@ -115,17 +144,18 @@ export default function Index() {
         personalId={personalId}
         onNavigate={section => {
           if (section === "personal-id" && personalId) {
-            handleShowPersonalIdDetails(); // Show modal
+            handleShowPersonalIdDetails();
           } else if (section === "personal-id") {
-            setPidStep("create"); // Creation
+            setPidStep("create");
           } else if (section === "personal-safety") {
-          setSafetyActive(true);
-        }
-          // ...others
+            setSafetyActive(true);
+          }
+          // ...other navigation as needed
         }}
         onLogout={() => {
           setLoggedInUser(null);
           setGuestMode(false);
+          setUserEmail(null);
           setConfirmedLanguage(null);
           setPersonalId(null);
         }}

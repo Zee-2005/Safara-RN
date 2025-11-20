@@ -1,5 +1,6 @@
 // src/lib/pidDocs.ts
-const BASE = 'https://safara-backend.onrender.com/api/v1/pid';
+// const BASE = 'https://safara-backend.onrender.com/api/v1/auth';
+const BASE = 'http://192.168.0.103:3000/api/v1/pid';
 
 async function parseError(res: Response) {
   let msg = 'Request failed';

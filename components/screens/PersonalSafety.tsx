@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList, Alert
 } from 'react-native';
@@ -319,6 +320,7 @@ export default function PersonalSafety({ isGuest = false, onBack }: PersonalSafe
   );
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={["top", "left", "right"]}>
     <View style={{ flex: 1, backgroundColor: "#f3f4f6" }}>
       {/* Header */}
       <View style={styles.header}>
@@ -362,6 +364,7 @@ export default function PersonalSafety({ isGuest = false, onBack }: PersonalSafe
         {activeTab === 'checks' ? renderSafetyChecksTab() : null}
       </ScrollView>
     </View>
+    </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
