@@ -12,6 +12,10 @@ import PersonalSafety from "../components/screens/Personalsafety";
 import { fetchAndSyncPersonalIdByEmail } from "../services/personalId"; // Adjust path as needed
 import PlanTripHub from "../components/screens/PlanTripHub"; // <--- Add the import
 import AgencyBrowse from "../components/screens/AgencyBrowse"; // <--- Add the import
+import DirectIdQuick from "@/components/screens/DirectIdQuick";
+import TripSummary from "@/components/screens/TripSummary";
+import { readTripDraft } from "@/lib/trip";
+
 
 export default function Index() {
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -39,7 +43,10 @@ export default function Index() {
   const [planTripActive, setPlanTripActive] = useState(false);
   const [agencyBrowseActive, setAgencyBrowseActive] = useState(false);
 // For demo, add this too:
-const [touristIdGenerateActive, setTouristIdGenerateActive] = useState(false);
+  const [touristIdGenerateActive, setTouristIdGenerateActive] = useState(false);
+  const [directIdActive, setDirectIdActive] = useState(false);
+  const [tripSummaryActive, setTripSummaryActive] = useState(false);
+  const [tripSummary, setTripSummary] = useState<any>(null);
 
   // Always fetch PID from backend after (re)login
   useEffect(() => {
@@ -143,6 +150,35 @@ const [touristIdGenerateActive, setTouristIdGenerateActive] = useState(false);
   );
 }
 
+  if (directIdActive && userEmail) {
+  return (
+    <DirectIdQuick
+      userEmail={userEmail}
+      onBack={() => setDirectIdActive(false)}
+      onProceed={async () => {
+        const summary = await readTripDraft(userEmail);
+        setTripSummary(summary);
+        setDirectIdActive(false);
+        setTripSummaryActive(true);
+      }}
+    />
+  );
+}
+
+if (tripSummaryActive && tripSummary) {
+  return (
+    <TripSummary
+  visible={tripSummaryActive}
+  summary={tripSummary}
+  onClose={() => { setTripSummaryActive(false); setDirectIdActive(true); }}
+  onProceed={() => { /* TODO: Implement submission or navigation */ }}
+/>
+
+  );
+}
+
+ 
+
   if (planTripActive) {
     return (
       <PlanTripHub
@@ -152,7 +188,7 @@ const [touristIdGenerateActive, setTouristIdGenerateActive] = useState(false);
             // Navigate to agencies (add screen and state when ready)
             setAgencyBrowseActive(true);
           } else if (section === "direct") {
-            // setDirectIdActive(true);
+            setDirectIdActive(true);
           } else if (section === "ai") {
             // Do nothing or show "coming soon"
           }
