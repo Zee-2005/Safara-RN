@@ -1,4 +1,4 @@
-// components/screens/HomeScreen.tsx  [memory:13]
+// components/screens/HomeScreen.tsx
 
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -54,21 +54,37 @@ export default function HomeScreen({
   const [newCount, setNewCount] = useState(0);
 
   useEffect(() => {
-    if (isGuest || !userEmail) return;
+    if (isGuest || (!userEmail && !personalId)) return;
+
     (async () => {
       try {
-        const data = await getMyTrips(userEmail);
-        const list = data?.trips || [];
+        let list: TripItem[] = [];
+
+        // 1) Try by userEmail (preferred)
+        if (userEmail) {
+          const data = await getMyTrips(userEmail);
+          list = data?.trips || [];
+        }
+
+        // 2) Fallback: if nothing came back and we have a PID,
+        //    try again using personalId (in case backend stored userId that way)
+        if ((!list || list.length === 0) && personalId) {
+          const dataPid = await getMyTrips(personalId);
+          list = dataPid?.trips || [];
+        }
+
         setTrips(list);
 
-        const seenKey = `trips_seen_count:${userEmail}`;
+        // Notification "new" count logic
+        const keyBase = userEmail || personalId || "global";
+        const seenKey = `trips_seen_count:${keyBase}`;
         const seenRaw = await AsyncStorage.getItem(seenKey);
         const seen = seenRaw ? parseInt(seenRaw, 10) : 0;
         const total = list.length;
         const diff = total - seen;
         setNewCount(diff > 0 ? diff : 0);
       } catch {
-        // ignore
+        // ignore errors, show empty state
       }
     })();
   }, [isGuest, userEmail, personalId, showTrips]);
@@ -85,13 +101,12 @@ export default function HomeScreen({
 
   async function handleOpenTrips() {
     setShowTrips(true);
-    if (userEmail) {
-      await AsyncStorage.setItem(
-        `trips_seen_count:${userEmail}`,
-        String(trips.length)
-      );
-      setNewCount(0);
-    }
+    const keyBase = userEmail || personalId || "global";
+    await AsyncStorage.setItem(
+      `trips_seen_count:${keyBase}`,
+      String(trips.length)
+    );
+    setNewCount(0);
   }
 
   function daysBetween(a: string, b: string): number {
@@ -192,9 +207,7 @@ export default function HomeScreen({
                   <Text style={styles.bellBadgeText}>{bellCount}</Text>
                 </View>
               )}
-              {newCount > 0 && (
-                <View style={styles.newDot} />
-              )}
+              {/* {newCount > 0 && <View style={styles.newDot} />} */}
             </TouchableOpacity>
           )}
           {!isGuest && (
@@ -407,7 +420,12 @@ const styles = StyleSheet.create({
   },
   guestText: { color: "#2563eb", fontSize: 14 },
   content: { padding: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12, marginTop: 24 },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+    marginTop: 24,
+  },
   sectionCard: { padding: 16, marginBottom: 12, borderRadius: 12, elevation: 2 },
   disabledCard: { opacity: 0.5 },
   sectionInnerRow: { flexDirection: "row", alignItems: "center" },

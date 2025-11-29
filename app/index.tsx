@@ -1,4 +1,4 @@
-// app/(root)/index.tsx  [memory:13]
+// app/(root)/index.tsx
 
 import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -184,7 +184,7 @@ export default function Index() {
         onSubmitted={(isActive: boolean) => {
           setTouristIdDocsActive(false);
           setPlanTripActive(false);
-          // Now HomeScreen will render next
+          // HomeScreen will render next
         }}
       />
     );
@@ -231,7 +231,7 @@ export default function Index() {
       <SafeAreaView style={{ flex: 1 }}>
         <HomeScreen
           userPhone={loggedInUser || undefined}
-          // userEmail={userEmail || undefined}
+          userEmail={userEmail || undefined}
           isGuest={guestMode}
           personalId={personalId}
           onNavigate={(section) => {
