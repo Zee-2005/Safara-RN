@@ -1,4 +1,5 @@
-// components/screens/HomeScreen.tsx
+// src/components/screens/HomeScreen.tsx
+// 5-tab footer: Home, Tour, Chatbot, Community, Profile + theme toggle
 
 import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,10 +12,6 @@ import {
   Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import Card from "../ui/Card";
-import Badge from "../ui/Badge";
-import { getMyTrips } from "../../lib/tourist.service";
 import {
   Ionicons,
   Feather,
@@ -22,11 +19,19 @@ import {
   FontAwesome,
 } from "@expo/vector-icons";
 
+import Badge from "../ui/Badge";
+import ActivatedTourMode, {
+  TouristId,
+} from "./ActivatedTourMode";
+import { getMyTrips } from "../../lib/tourist.service";
+
 interface HomeScreenProps {
   userPhone?: string;
   userEmail?: string;
   isGuest?: boolean;
   personalId?: string | null;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
   onNavigate: (section: string) => void;
   onLogout?: () => void;
 }
@@ -46,6 +51,8 @@ export default function HomeScreen({
   userEmail,
   isGuest = false,
   personalId,
+  theme,
+  onToggleTheme,
   onNavigate,
   onLogout,
 }: HomeScreenProps) {
@@ -53,61 +60,58 @@ export default function HomeScreen({
   const [showTrips, setShowTrips] = useState(false);
   const [newCount, setNewCount] = useState(0);
 
+  const [viewMode, setViewMode] = useState<
+    "home" | "tour" | "chat" | "community" | "profile"
+  >("home");
+  const [initialViewSet, setInitialViewSet] = useState(false);
+
+  const isDark = theme === "dark";
+
   useEffect(() => {
-    if (isGuest || (!userEmail && !personalId)) return;
+    if (isGuest || !userEmail) return;
 
     (async () => {
       try {
-        let list: TripItem[] = [];
-
-        // 1) Try by userEmail (preferred)
-        if (userEmail) {
-          const data = await getMyTrips(userEmail);
-          list = data?.trips || [];
-        }
-
-        // 2) Fallback: if nothing came back and we have a PID,
-        //    try again using personalId (in case backend stored userId that way)
-        if ((!list || list.length === 0) && personalId) {
-          const dataPid = await getMyTrips(personalId);
-          list = dataPid?.trips || [];
-        }
-
+        const data = await getMyTrips(userEmail);
+        const list = (data?.trips || []) as TripItem[];
         setTrips(list);
 
-        // Notification "new" count logic
-        const keyBase = userEmail || personalId || "global";
-        const seenKey = `trips_seen_count:${keyBase}`;
+        const seenKey = `trips_seen_count:${userEmail}`;
         const seenRaw = await AsyncStorage.getItem(seenKey);
         const seen = seenRaw ? parseInt(seenRaw, 10) : 0;
         const total = list.length;
         const diff = total - seen;
         setNewCount(diff > 0 ? diff : 0);
       } catch {
-        // ignore errors, show empty state
+        setTrips([]);
+        setNewCount(0);
       }
     })();
-  }, [isGuest, userEmail, personalId, showTrips]);
+  }, [isGuest, userEmail, personalId]);
 
   const active = trips.filter((t) => t.status === "active");
   const upcoming = trips.filter((t) => t.status === "scheduled");
   const expired = trips.filter((t) => t.status === "expired");
   const bellCount = active.length + upcoming.length;
 
-  function handleSectionClick(id: string, status: string) {
-    if (status === "disabled") return;
-    onNavigate(id);
-  }
+  const activeTrip = active[0] || null;
+  const touristIdForTourMode: TouristId | null = activeTrip
+    ? {
+        id: activeTrip.tid,
+        destination: activeTrip.destination || "Unknown",
+        validUntil: new Date(activeTrip.endDate),
+        status: "active",
+      }
+    : null;
 
-  async function handleOpenTrips() {
-    setShowTrips(true);
-    const keyBase = userEmail || personalId || "global";
-    await AsyncStorage.setItem(
-      `trips_seen_count:${keyBase}`,
-      String(trips.length)
-    );
-    setNewCount(0);
-  }
+  // Initial tab selection: Tour if active trip exists, otherwise Home
+  useEffect(() => {
+    if (!initialViewSet) {
+      if (activeTrip) setViewMode("tour");
+      else setViewMode("home");
+      setInitialViewSet(true);
+    }
+  }, [activeTrip, initialViewSet]);
 
   function daysBetween(a: string, b: string): number {
     const d1 = new Date(a);
@@ -117,6 +121,22 @@ export default function HomeScreen({
   }
 
   const todayISO = new Date().toISOString().slice(0, 10);
+
+  async function handleOpenTrips() {
+    setShowTrips(true);
+    if (userEmail) {
+      await AsyncStorage.setItem(
+        `trips_seen_count:${userEmail}`,
+        String(trips.length)
+      );
+      setNewCount(0);
+    }
+  }
+
+  function handleSectionClick(id: string, status: string) {
+    if (status === "disabled") return;
+    onNavigate(id);
+  }
 
   const sectionIcons: any = {
     "personal-id": <Feather name="shield" size={24} color="#fff" />,
@@ -179,202 +199,488 @@ export default function HomeScreen({
 
   const visibleSections = sections;
 
-  return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: "#f9fafb" }}
-      edges={["top", "left", "right"]}
-    >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>SaFara</Text>
-          <Text style={styles.subtitle}>
-            {isGuest ? "Guest Mode" : `Welcome, ${userPhone}`}
-          </Text>
-        </View>
-        <View style={styles.iconRow}>
-          {!isGuest && (
+  const bgHeader = isDark ? "#020617" : "#ffffff";
+  const borderHeader = isDark ? "#1f2937" : "#e5e7eb";
+  const textMain = isDark ? "#f9fafb" : "#111827";
+  const textSub = isDark ? "#9ca3af" : "#6b7280";
+  const bgGuest = isDark ? "rgba(37,99,235,0.15)" : "rgba(36,107,253,0.1)";
+  const hubTitleColor = textMain;
+
+  function renderHomeContent() {
+    return (
+      <>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: bgHeader, borderColor: borderHeader },
+          ]}
+        >
+          <View>
+            <Text style={[styles.title, { color: textMain }]}>SaFara</Text>
+            <Text style={[styles.subtitle, { color: textSub }]}>
+              {isGuest ? "Guest Mode" : `Welcome, ${userPhone}`}
+            </Text>
+          </View>
+          <View style={styles.iconRow}>
+            {!isGuest && (
+              <TouchableOpacity
+                onPress={handleOpenTrips}
+                style={styles.headerBtn}
+              >
+                <MaterialCommunityIcons
+                  name="bell-outline"
+                  size={24}
+                  color="#2563eb"
+                />
+                {bellCount > 0 && (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>{bellCount}</Text>
+                  </View>
+                )}
+                {newCount > 0 && <View style={styles.newDot} />}
+              </TouchableOpacity>
+            )}
+            {/* Theme toggle */}
             <TouchableOpacity
-              onPress={handleOpenTrips}
+              onPress={onToggleTheme}
               style={styles.headerBtn}
             >
-              <MaterialCommunityIcons
-                name="bell-outline"
+              <Feather
+                name={isDark ? "sun" : "moon"}
                 size={24}
                 color="#2563eb"
               />
-              {bellCount > 0 && (
-                <View style={styles.bellBadge}>
-                  <Text style={styles.bellBadgeText}>{bellCount}</Text>
-                </View>
-              )}
-              {/* {newCount > 0 && <View style={styles.newDot} />} */}
             </TouchableOpacity>
-          )}
-          {!isGuest && (
+            {!isGuest && (
+              <TouchableOpacity onPress={onLogout} style={styles.headerBtn}>
+                <Feather name="log-out" size={24} color="#2563eb" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.headerBtn}>
-              <Ionicons
-                name="person-circle-outline"
-                size={24}
-                color="#2563eb"
-              />
-            </TouchableOpacity>
-          )}
-          {!isGuest && (
-            <TouchableOpacity onPress={onLogout} style={styles.headerBtn}>
-              <Feather name="log-out" size={24} color="#2563eb" />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.headerBtn}>
-            <Feather name="settings" size={24} color="#2563eb" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {isGuest && (
-        <View style={styles.guestBanner}>
-          <Text style={styles.guestText}>
-            Sign in to access Personal ID and full safety tools.
-          </Text>
-        </View>
-      )}
-
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={{ paddingBottom: 100 }}
-      >
-        <View>
-          <Text style={styles.sectionTitle}>Travel Safety Hub</Text>
-          {visibleSections.map((section) => (
-            <TouchableOpacity
-              key={section.id}
-              style={[
-                styles.sectionCard,
-                { backgroundColor: "#fff" },
-                section.status === "disabled" && styles.disabledCard,
-              ]}
-              onPress={() => handleSectionClick(section.id, section.status)}
-              disabled={section.status === "disabled"}
-            >
-              <View style={styles.sectionInnerRow}>
-                <View
-                  style={[styles.iconBox, { backgroundColor: section.color }]}
-                >
-                  {sectionIcons[section.icon]}
-                </View>
-                <View style={styles.sectionTextContainer}>
-                  <View style={styles.sectionTitleRow}>
-                    <Text style={styles.sectionTitleText}>
-                      {section.title}
-                    </Text>
-                    {section.badge && (
-                      <Badge variant="secondary">{section.badge}</Badge>
-                    )}
-                    {section.status === "disabled" && (
-                      <Badge variant="destructive">Login Required</Badge>
-                    )}
-                    {section.status === "limited" && (
-                      <Badge variant="outline">Limited Access</Badge>
-                    )}
-                    {section.status === "view-only" && (
-                      <Badge variant="outline">View Only</Badge>
-                    )}
-                  </View>
-                  <Text style={styles.sectionDescription}>
-                    {section.description}
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={24} color="#6b7280" />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Trips modal */}
-      <Modal
-        visible={showTrips}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowTrips(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Your trips</Text>
-            <ScrollView style={{ maxHeight: 300, alignSelf: "stretch" }}>
-              {active.map((t) => {
-                const daysLeft = Math.max(
-                  0,
-                  daysBetween(todayISO, t.endDate)
-                );
-                return (
-                  <View key={t.tid} style={styles.tripItem}>
-                    <View style={styles.tripItemHeader}>
-                      <Text style={styles.tripItemTitle}>
-                        Active • {t.destination || "Unknown"}
-                      </Text>
-                      <Badge variant="secondary">Active</Badge>
-                    </View>
-                    <Text style={styles.tripItemDetails}>
-                      {t.startDate} → {t.endDate} • ends in {daysLeft}{" "}
-                      day{daysLeft === 1 ? "" : "s"}
-                    </Text>
-                    <Text style={styles.tripId}>{t.tid}</Text>
-                  </View>
-                );
-              })}
-
-              {upcoming.map((t) => {
-                const daysUntil = Math.max(
-                  0,
-                  daysBetween(todayISO, t.startDate)
-                );
-                return (
-                  <View key={t.tid} style={styles.tripItem}>
-                    <View style={styles.tripItemHeader}>
-                      <Text style={styles.tripItemTitle}>
-                        Upcoming • {t.destination || "Unknown"}
-                      </Text>
-                      <Badge variant="outline">Scheduled</Badge>
-                    </View>
-                    <Text style={styles.tripItemDetails}>
-                      {t.startDate} → {t.endDate} • starts in {daysUntil}{" "}
-                      day{daysUntil === 1 ? "" : "s"}
-                    </Text>
-                    <Text style={styles.tripId}>{t.tid}</Text>
-                  </View>
-                );
-              })}
-
-              {expired.map((t) => (
-                <View key={t.tid} style={styles.tripItem}>
-                  <View style={styles.tripItemHeader}>
-                    <Text style={styles.tripItemTitle}>
-                      Expired • {t.destination || "Unknown"}
-                    </Text>
-                    <Badge variant="destructive">Expired</Badge>
-                  </View>
-                  <Text style={styles.tripItemDetails}>
-                    {t.startDate} → {t.endDate}
-                  </Text>
-                  <Text style={styles.tripId}>{t.tid}</Text>
-                </View>
-              ))}
-
-              {trips.length === 0 && (
-                <Text style={styles.noTripText}>
-                  No trips yet. Plan a journey to see notifications here.
-                </Text>
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              onPress={() => setShowTrips(false)}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
+              <Feather name="settings" size={24} color="#2563eb" />
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+
+        {isGuest && (
+          <View style={[styles.guestBanner, { backgroundColor: bgGuest }]}>
+            <Text style={[styles.guestText, { color: "#2563eb" }]}>
+              Sign in to access Personal ID and full safety tools.
+            </Text>
+          </View>
+        )}
+
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: 100 }}
+        >
+          <View>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: hubTitleColor },
+              ]}
+            >
+              Travel Safety Hub
+            </Text>
+            {visibleSections.map((section) => (
+              <TouchableOpacity
+                key={section.id}
+                style={[
+                  styles.sectionCard,
+                  {
+                    backgroundColor: isDark ? "#020617" : "#ffffff",
+                    borderColor: isDark ? "#1f2937" : "transparent",
+                  },
+                  section.status === "disabled" && styles.disabledCard,
+                ]}
+                onPress={() =>
+                  handleSectionClick(section.id, section.status)
+                }
+                disabled={section.status === "disabled"}
+              >
+                <View style={styles.sectionInnerRow}>
+                  <View
+                    style={[
+                      styles.iconBox,
+                      { backgroundColor: section.color },
+                    ]}
+                  >
+                    {sectionIcons[section.icon]}
+                  </View>
+                  <View style={styles.sectionTextContainer}>
+                    <View style={styles.sectionTitleRow}>
+                      <Text
+                        style={[
+                          styles.sectionTitleText,
+                          { color: textMain },
+                        ]}
+                      >
+                        {section.title}
+                      </Text>
+                      {section.badge && (
+                        <Badge variant="secondary">
+                          {section.badge}
+                        </Badge>
+                      )}
+                      {section.status === "disabled" && (
+                        <Badge variant="destructive">
+                          Login Required
+                        </Badge>
+                      )}
+                      {section.status === "limited" && (
+                        <Badge variant="outline">Limited Access</Badge>
+                      )}
+                      {section.status === "view-only" && (
+                        <Badge variant="outline">View Only</Badge>
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.sectionDescription,
+                        { color: textSub },
+                      ]}
+                    >
+                      {section.description}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={24} color="#6b7280" />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Trips modal */}
+        <Modal
+          visible={showTrips}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTrips(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: isDark ? "#020617" : "#ffffff" },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.modalTitle,
+                  { color: textMain },
+                ]}
+              >
+                Your trips
+              </Text>
+              <ScrollView
+                style={{ maxHeight: 300, alignSelf: "stretch" }}
+              >
+                {active.map((t) => {
+                  const daysLeft = Math.max(
+                    0,
+                    daysBetween(todayISO, t.endDate)
+                  );
+                  return (
+                    <View key={t.tid} style={styles.tripItem}>
+                      <View style={styles.tripItemHeader}>
+                        <Text
+                          style={[
+                            styles.tripItemTitle,
+                            { color: textMain },
+                          ]}
+                        >
+                          Active • {t.destination || "Unknown"}
+                        </Text>
+                        <Badge variant="secondary">Active</Badge>
+                      </View>
+                      <Text
+                        style={[
+                          styles.tripItemDetails,
+                          { color: textSub },
+                        ]}
+                      >
+                        {t.startDate} → {t.endDate} • ends in {daysLeft}{" "}
+                        day{daysLeft === 1 ? "" : "s"}
+                      </Text>
+                      <Text style={styles.tripId}>{t.tid}</Text>
+                    </View>
+                  );
+                })}
+
+                {upcoming.map((t) => {
+                  const daysUntil = Math.max(
+                    0,
+                    daysBetween(todayISO, t.startDate)
+                  );
+                  return (
+                    <View key={t.tid} style={styles.tripItem}>
+                      <View style={styles.tripItemHeader}>
+                        <Text
+                          style={[
+                            styles.tripItemTitle,
+                            { color: textMain },
+                          ]}
+                        >
+                          Upcoming • {t.destination || "Unknown"}
+                        </Text>
+                        <Badge variant="outline">Scheduled</Badge>
+                      </View>
+                      <Text
+                        style={[
+                          styles.tripItemDetails,
+                          { color: textSub },
+                        ]}
+                      >
+                        {t.startDate} → {t.endDate} • starts in {daysUntil}{" "}
+                        day{daysUntil === 1 ? "" : "s"}
+                      </Text>
+                      <Text style={styles.tripId}>{t.tid}</Text>
+                    </View>
+                  );
+                })}
+
+                {expired.map((t) => (
+                  <View key={t.tid} style={styles.tripItem}>
+                    <View style={styles.tripItemHeader}>
+                      <Text
+                        style={[
+                          styles.tripItemTitle,
+                          { color: textMain },
+                        ]}
+                      >
+                        Expired • {t.destination || "Unknown"}
+                      </Text>
+                      <Badge variant="destructive">Expired</Badge>
+                    </View>
+                    <Text
+                      style={[
+                        styles.tripItemDetails,
+                        { color: textSub },
+                      ]}
+                    >
+                      {t.startDate} → {t.endDate}
+                    </Text>
+                    <Text style={styles.tripId}>{t.tid}</Text>
+                  </View>
+                ))}
+
+                {trips.length === 0 && (
+                  <Text style={styles.noTripText}>
+                    No trips yet. Plan a journey to see notifications here.
+                  </Text>
+                )}
+              </ScrollView>
+              <TouchableOpacity
+                onPress={() => setShowTrips(false)}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
+  }
+
+  function renderPlaceholder(title: string, desc: string) {
+    return (
+      <View
+        style={[
+          styles.placeholderContainer,
+          { backgroundColor: isDark ? "#020617" : "#f9fafb" },
+        ]}
+      >
+        <Text style={[styles.placeholderTitle, { color: textMain }]}>
+          {title}
+        </Text>
+        <Text style={[styles.placeholderText, { color: textSub }]}>
+          {desc}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: isDark ? "#020617" : "#f9fafb" }}
+      edges={["top", "left", "right"]}
+    >
+      <View style={{ flex: 1 }}>
+        {viewMode === "home" && renderHomeContent()}
+        {viewMode === "tour" && (
+          <ActivatedTourMode
+            touristId={touristIdForTourMode}
+            theme={theme}
+            onSOS={() => {
+              // hook into SOS later
+            }}
+            onNavigate={onNavigate}
+            onLogout={onLogout || (() => {})}
+          />
+        )}
+        {viewMode === "chat" &&
+          renderPlaceholder("Chatbot", "Smart travel assistant coming soon.")}
+        {viewMode === "community" &&
+          renderPlaceholder(
+            "Community & Alerts",
+            "Recent news, alerts and local communities will appear here."
+          )}
+        {viewMode === "profile" &&
+          renderPlaceholder(
+            "Profile",
+            "Manage your account, preferences and saved trips here."
+          )}
+
+        {/* Footer with 5 tabs */}
+        <View
+          style={[
+            styles.footerTabs,
+            { backgroundColor: isDark ? "#020617" : "#ffffff" },
+          ]}
+        >
+          <TouchableOpacity
+            style={[
+              styles.footerTab,
+              viewMode === "home" && styles.footerTabActive,
+            ]}
+            onPress={() => setViewMode("home")}
+          >
+            <Feather
+              name="home"
+              size={18}
+              color={
+                viewMode === "home"
+                  ? "#0b0b0b"
+                  : isDark
+                  ? "#e5e7eb"
+                  : "#6b7280"
+              }
+            />
+            <Text
+              style={[
+                styles.footerTabText,
+                viewMode === "home" && styles.footerTabTextActive,
+              ]}
+            >
+              Home
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.footerTab,
+              viewMode === "tour" && styles.footerTabActive,
+            ]}
+            onPress={() => setViewMode("tour")}
+          >
+            <Feather
+              name="shield"
+              size={18}
+              color={
+                viewMode === "tour"
+                  ? "#0b0b0b"
+                  : isDark
+                  ? "#e5e7eb"
+                  : "#6b7280"
+              }
+            />
+            <Text
+              style={[
+                styles.footerTabText,
+                viewMode === "tour" && styles.footerTabTextActive,
+              ]}
+            >
+              Tour
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.footerTab,
+              viewMode === "chat" && styles.footerTabActive,
+            ]}
+            onPress={() => setViewMode("chat")}
+          >
+            <Feather
+              name="message-circle"
+              size={18}
+              color={
+                viewMode === "chat"
+                  ? "#0b0b0b"
+                  : isDark
+                  ? "#e5e7eb"
+                  : "#6b7280"
+              }
+            />
+            <Text
+              style={[
+                styles.footerTabText,
+                viewMode === "chat" && styles.footerTabTextActive,
+              ]}
+            >
+              Chat
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.footerTab,
+              viewMode === "community" && styles.footerTabActive,
+            ]}
+            onPress={() => setViewMode("community")}
+          >
+            <Feather
+              name="users"
+              size={18}
+              color={
+                viewMode === "community"
+                  ? "#0b0b0b"
+                  : isDark
+                  ? "#e5e7eb"
+                  : "#6b7280"
+              }
+            />
+            <Text
+              style={[
+                styles.footerTabText,
+                viewMode === "community" && styles.footerTabTextActive,
+              ]}
+            >
+              Community
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.footerTab,
+              viewMode === "profile" && styles.footerTabActive,
+            ]}
+            onPress={() => setViewMode("profile")}
+          >
+            <Feather
+              name="user"
+              size={18}
+              color={
+                viewMode === "profile"
+                  ? "#0b0b0b"
+                  : isDark
+                  ? "#e5e7eb"
+                  : "#6b7280"
+              }
+            />
+            <Text
+              style={[
+                styles.footerTabText,
+                viewMode === "profile" && styles.footerTabTextActive,
+              ]}
+            >
+              Profile
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -386,10 +692,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderColor: "#e5e7eb",
   },
-  title: { fontSize: 20, fontWeight: "700", color: "#111827" },
-  subtitle: { fontSize: 14, color: "#6b7280" },
+  title: { fontSize: 20, fontWeight: "700" },
+  subtitle: { fontSize: 14 },
   iconRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -416,9 +721,8 @@ const styles = StyleSheet.create({
   },
   guestBanner: {
     padding: 12,
-    backgroundColor: "rgba(36, 107, 253, 0.1)",
   },
-  guestText: { color: "#2563eb", fontSize: 14 },
+  guestText: { fontSize: 14 },
   content: { padding: 16 },
   sectionTitle: {
     fontSize: 20,
@@ -426,7 +730,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 24,
   },
-  sectionCard: { padding: 16, marginBottom: 12, borderRadius: 12, elevation: 2 },
+  sectionCard: {
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    elevation: 2,
+    borderWidth: 1,
+  },
   disabledCard: { opacity: 0.5 },
   sectionInnerRow: { flexDirection: "row", alignItems: "center" },
   iconBox: {
@@ -440,7 +750,7 @@ const styles = StyleSheet.create({
   sectionTextContainer: { flex: 1 },
   sectionTitleRow: { flexDirection: "row", alignItems: "center" },
   sectionTitleText: { fontSize: 16, fontWeight: "600", marginRight: 5 },
-  sectionDescription: { color: "#6b7280", marginTop: 4 },
+  sectionDescription: { marginTop: 4 },
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -449,7 +759,6 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: 340,
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
   },
@@ -466,7 +775,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   tripItemTitle: { fontSize: 16, fontWeight: "600" },
-  tripItemDetails: { fontSize: 14, color: "#6b7280" },
+  tripItemDetails: { fontSize: 14 },
   tripId: { fontSize: 12, marginTop: 4, color: "#9ca3af" },
   noTripText: { textAlign: "center", color: "#6b7280", marginVertical: 16 },
   closeButton: {
@@ -478,4 +787,35 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563eb",
   },
   closeButtonText: { color: "#ffffff", fontWeight: "600" },
+  placeholderContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
+  placeholderText: { fontSize: 14, textAlign: "center", paddingHorizontal: 24 },
+  footerTabs: {
+    flexDirection: "row",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#1f2937",
+  },
+  footerTab: {
+    flex: 1,
+    paddingVertical: 8,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    rowGap: 2,
+  },
+  footerTabActive: {
+    backgroundColor: "#e5e7eb",
+  },
+  footerTabText: {
+    fontSize: 11,
+    color: "#6b7280",
+    fontWeight: "500",
+  },
+  footerTabTextActive: {
+    color: "#0b0b0b",
+  },
 });

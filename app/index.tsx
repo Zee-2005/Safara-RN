@@ -54,6 +54,8 @@ export default function Index() {
   const [touristIdDocsActive, setTouristIdDocsActive] = useState(false);
   const [directIdActive, setDirectIdActive] = useState(false);
 
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
   useEffect(() => {
     if (userEmail) {
       fetchAndSyncPersonalIdByEmail(userEmail).then((pidData) => {
@@ -77,6 +79,9 @@ export default function Index() {
     setUserEmail(phoneOrEmail);
     setLoggedInUser(phoneOrEmail);
   }
+
+  const toggleTheme = () =>
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
 
   if (!confirmedLanguage) {
     return (
@@ -144,7 +149,6 @@ export default function Index() {
     );
   }
 
-  // Agencies flow: PlanTripHub → AgencyBrowse → (modal) Generate ID → TouristIdDocs
   if (agencyBrowseActive && userEmail) {
     return (
       <AgencyBrowse
@@ -158,7 +162,6 @@ export default function Index() {
     );
   }
 
-  // Direct flow: PlanTripHub → DirectIdQuick → (modal) Generate ID → TouristIdDocs
   if (directIdActive && userEmail) {
     return (
       <DirectIdQuick
@@ -172,7 +175,6 @@ export default function Index() {
     );
   }
 
-  // After any ID is generated, upload docs then go back home
   if (touristIdDocsActive && userEmail) {
     return (
       <TouristIdDocs
@@ -184,7 +186,6 @@ export default function Index() {
         onSubmitted={(isActive: boolean) => {
           setTouristIdDocsActive(false);
           setPlanTripActive(false);
-          // HomeScreen will render next
         }}
       />
     );
@@ -226,14 +227,18 @@ export default function Index() {
     setShowPersonalIdModal(true);
   };
 
+  const bgColor = theme === "light" ? "#f9fafb" : "#020617";
+
   return (
     <>
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
         <HomeScreen
           userPhone={loggedInUser || undefined}
           userEmail={userEmail || undefined}
           isGuest={guestMode}
           personalId={personalId}
+          theme={theme}
+          onToggleTheme={toggleTheme}
           onNavigate={(section) => {
             if (section === "personal-id" && personalId) {
               handleShowPersonalIdDetails();
