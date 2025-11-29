@@ -1,115 +1,146 @@
-// src/lib/tourist.service.ts
-import { getSession } from '@/lib/session';
+// libs/tourist.service.ts (React Native)
 
-// const BASE = 'https://safara-backend.onrender.com/api/v1/auth';
-const BASE = 'http://192.168.0.103:3000/api/v1/auth';
+const BASE = "http://192.168.0.100:3000/api/v1/tourist";
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const s = await getSession();
-  const h: Record<string, string> = {};
-  if (s?.userId) h['x-user-id'] = s.userId;
-  return h;
-}
+type TripStatus = "active" | "scheduled" | "expired";
+export type TravelerType = "indian" | "international";
 
-async function jsonHeaders(): Promise<Record<string, string>> {
-  const h = await authHeaders();
-  return { 'Content-Type': 'application/json', ...h };
-}
-
-async function parse(res: Response) {
-  if (!res.ok) {
-    const ct = res.headers.get('content-type') || '';
-    let msg = `${res.status} ${res.statusText}`;
-    try {
-      msg = ct.includes('application/json') ? (await res.json())?.error || msg : (await res.text() || msg);
-    } catch {}
-    throw new Error(msg);
-  }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('application/json') ? res.json() : res.text();
-}
-export async function createTrip(payload: {
-  holderPid: string;
-  startDate: string;
-  endDate: string;
+export type CreateTripPayload = {
+  // Send userId in body (backend also accepts x-user-id header)
+  userId: string;
+  holderPid: string; // PID applicationId (_id) used as holderPid
+  startDate: string; // yyyy-mm-dd
+  endDate: string;   // yyyy-mm-dd
   destination?: string | null;
   itinerary?: string | null;
   agencyId?: string | null;
   homeCity?: string | null;
-  travelerType?: 'indian' | 'international';
-}) {
+  travelerType?: TravelerType;
+};
+
+export type TripResponse = {
+  tid: string;
+  status: TripStatus;
+  startDate: string;
+  endDate: string;
+  destination: string | null;
+  itinerary: string | null;
+  agencyId: string | null;
+  homeCity: string | null;
+  travelerType: TravelerType;
+  createdAt: string;
+};
+
+async function parse(res: Response) {
+  if (!res.ok) {
+    const ct = res.headers.get("content-type") || "";
+    let msg = `${res.status} ${res.statusText}`;
+    try {
+      if (ct.includes("application/json")) {
+        const body = (await res.json()) as any;
+        msg = body?.error || msg;
+      } else {
+        const text = await res.text();
+        msg = text || msg;
+      }
+    } catch {
+      // ignore parse errors; fall back to default msg
+    }
+    throw new Error(msg);
+  }
+
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    return res.json();
+  }
+  return res.text();
+}
+
+export async function createTrip(
+  payload: CreateTripPayload
+): Promise<TripResponse> {
   const res = await fetch(`${BASE}/trips`, {
-    method: 'POST',
-    headers: await jsonHeaders(),
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(payload),
   });
-  return parse(res) as Promise<{
-    tid: string;
-    status: 'active' | 'scheduled' | 'expired';
-    startDate: string;
-    endDate: string;
-    destination: string | null;
-    itinerary: string | null;
-    agencyId: string | null;
-    homeCity: string | null;
-    travelerType: 'indian' | 'international';
-    createdAt: string;
-  }>;
+
+  return (parse(res) as Promise<TripResponse>);
 }
+
+// React Native file-like type for uploads
+export type UploadableFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
+
+export type UploadTripDocsFiles = {
+  passport?: UploadableFile | null;
+  visa?: UploadableFile | null;
+  ticket?: UploadableFile | null;
+  hotel?: UploadableFile | null;
+  permits?: UploadableFile | null;
+};
 
 export async function uploadTripDocs(
   tid: string,
-  travelerType: 'indian' | 'international',
-  files: { passport?: File | null; visa?: File | null; ticket?: File | null; hotel?: File | null; permits?: File | null }
-) {
+  travelerType: TravelerType,
+  files: UploadTripDocsFiles
+): Promise<{ ok: true; tid: string; travelerType: TravelerType }> {
   const fd = new FormData();
-  if (travelerType === 'international') {
-    if (files.passport) fd.append('passport', files.passport);
-    if (files.visa) fd.append('visa', files.visa);
-  }
-  if (files.ticket) fd.append('ticket', files.ticket);
-  if (files.hotel) fd.append('hotel', files.hotel);
-  if (travelerType === 'indian' && files.permits) fd.append('permits', files.permits);
 
-  const res = await fetch(`${BASE}/trips/${tid}/docs`, {
-    method: 'POST',
-    headers: await authHeaders(), // do not set Content-Type for FormData
+  if (travelerType === "international") {
+    if (files.passport) {
+      fd.append("passport", files.passport as any);
+    }
+    if (files.visa) {
+      fd.append("visa", files.visa as any);
+    }
+  }
+
+  if (files.ticket) {
+    fd.append("ticket", files.ticket as any);
+  }
+
+  if (files.hotel) {
+    fd.append("hotel", files.hotel as any);
+  }
+
+  if (travelerType === "indian" && files.permits) {
+    fd.append("permits", files.permits as any);
+  }
+
+  const res = await fetch(`${BASE}/trips/${encodeURIComponent(tid)}/docs`, {
+    method: "POST",
+    // Do NOT set Content-Type manually for FormData in React Native
     body: fd,
   });
-  return parse(res) as Promise<{ ok: true; tid: string; travelerType: 'indian' | 'international' }>;
+
+  return (parse(res) as Promise<{ ok: true; tid: string; travelerType: TravelerType }>);
 }
 
-export async function getMyTrips() {
-  const res = await fetch(`${BASE}/trips`, { headers: await authHeaders() });
-  return parse(res) as Promise<{
-    trips: Array<{
-      tid: string;
-      status: 'active' | 'scheduled' | 'expired';
-      startDate: string;
-      endDate: string;
-      destination: string | null;
-      itinerary: string | null;
-      agencyId: string | null;
-      homeCity: string | null;
-      travelerType: 'indian' | 'international';
-      createdAt: string;
-    }>;
-  }>;
+export async function getMyTrips(
+  userId: string
+): Promise<{
+  trips: Array<TripResponse>;
+}> {
+  const url = `${BASE}/trips?userId=${encodeURIComponent(userId)}`;
+  const res = await fetch(url, {
+    method: "GET",
+  });
+
+  return (parse(res) as Promise<{
+    trips: Array<TripResponse>;
+  }>);
 }
 
-export async function getTrip(tid: string) {
-  const res = await fetch(`${BASE}/trips/${tid}`, { headers: await authHeaders() });
-  return parse(res) as Promise<{
-    tid: string;
-    status: 'active' | 'scheduled' | 'expired';
-    startDate: string;
-    endDate: string;
-    destination: string | null;
-    itinerary: string | null;
-    agencyId: string | null;
-    homeCity: string | null;
-    travelerType: 'indian' | 'international';
-    createdAt: string;
-  }>;
-}
+export async function getTrip(tid: string): Promise<TripResponse> {
+  const res = await fetch(`${BASE}/trips/${encodeURIComponent(tid)}`, {
+    method: "GET",
+  });
 
+  return (parse(res) as Promise<TripResponse>);
+}

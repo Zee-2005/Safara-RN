@@ -1,52 +1,153 @@
+// components/screens/TripSummary.tsx
+// Flexible summary for "agencies" and "direct" trip modes
+
 import React from "react";
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Platform } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Modal,
+  TouchableOpacity,
+} from "react-native";
 import Card from "../ui/Card";
 import Button from "../ui/Button";
-import { Feather } from "@expo/vector-icons";
+import Badge from "../ui/Badge";
 
-type TripSummary = {
+export type TripMode = "agencies" | "direct" | "ai";
+
+export type TripSummaryData = {
+  mode: TripMode;
   startNow?: boolean;
-  startDate?: string;
-  endDate?: string;
-  homeCity?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  destination?: string | null;
+  itinerary?: string | null;
+  agencyId?: string | null;
+  homeCity?: string | null;
 };
 
-interface TripSummaryModalProps {
+type Props = {
   visible: boolean;
-  summary?: TripSummary | null;
+  summary: TripSummaryData;
   onClose: () => void;
   onProceed: () => void;
-}
+};
 
-export default function TripSummaryModal({ visible, summary, onClose, onProceed }: TripSummaryModalProps) {
-  if (!summary) return null;
+export default function TripSummary({
+  visible,
+  summary,
+  onClose,
+  onProceed,
+}: Props) {
+  const {
+    mode,
+    startNow,
+    startDate,
+    endDate,
+    destination,
+    itinerary,
+    agencyId,
+    homeCity,
+  } = summary;
+
+  const startLabel =
+    mode === "direct"
+      ? startNow
+        ? "Right now"
+        : startDate || "—"
+      : startDate || "—";
+
+  const endLabel = endDate || "—";
+
+  const destinationLabel =
+    mode === "agencies"
+      ? destination || "—"
+      : destination || "Auto-assign (not hometown)";
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      onRequestClose={onClose}
-      animationType="slide"
-    >
-      <View style={styles.bg}>
+    <Modal visible={visible} animationType="slide" transparent>
+      <View style={styles.overlay}>
         <View style={styles.modalCard}>
-          <View style={styles.header}>
-            <Text style={styles.modalTitle}>Trip Summary</Text>
-            <TouchableOpacity onPress={onClose} style={{ marginLeft: "auto" }}>
-              <Feather name="x" size={22} />
-            </TouchableOpacity>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Trip summary</Text>
+            <Badge>
+              <Text style={styles.badgeText}>{mode.toUpperCase()}</Text>
+            </Badge>
           </View>
-          <Card style={{ padding: 14 }}>
-            <Text style={styles.label}>Start:</Text>
-            <Text style={styles.value}>{summary.startNow ? "Now" : summary.startDate}</Text>
-            <Text style={styles.label}>End:</Text>
-            <Text style={styles.value}>{summary.endDate}</Text>
-            <Text style={styles.label}>Hometown:</Text>
-            <Text style={styles.value}>{summary.homeCity}</Text>
-            {/* Add more fields as needed */}
-            <Button style={{ marginTop: 20 }} onPress={onProceed}>
-              Proceed to generate Tourist ID
+
+          <ScrollView contentContainerStyle={styles.body}>
+            {/* Common fields */}
+            <View style={styles.row}>
+              <View style={styles.col}>
+                <Text style={styles.label}>Start</Text>
+                <Text style={styles.value}>{startLabel}</Text>
+              </View>
+              <View style={styles.col}>
+                <Text style={styles.label}>End</Text>
+                <Text style={styles.value}>{endLabel}</Text>
+              </View>
+            </View>
+
+            {/* Mode-specific sections */}
+            {mode === "direct" && (
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Hometown</Text>
+                  <Text style={styles.value}>{homeCity || "—"}</Text>
+                </View>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Destination</Text>
+                  <Text style={styles.value}>{destinationLabel}</Text>
+                </View>
+              </View>
+            )}
+
+            {mode === "agencies" && (
+              <>
+                <View style={styles.row}>
+                  <View style={styles.col}>
+                    <Text style={styles.label}>Destination</Text>
+                    <Text style={styles.value}>{destinationLabel}</Text>
+                  </View>
+                  <View style={styles.col}>
+                    <Text style={styles.label}>Agency</Text>
+                    <Text style={styles.value}>{agencyId || "—"}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.section}>
+                  <Text style={styles.label}>Planned visits / itinerary</Text>
+                  <View style={styles.itineraryBox}>
+                    <Text style={styles.itineraryText}>
+                      {itinerary || "—"}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {mode === "ai" && (
+              <View style={styles.section}>
+                <Text style={styles.label}>AI itinerary</Text>
+                <View style={styles.itineraryBox}>
+                  <Text style={styles.itineraryText}>
+                    {itinerary || "AI-generated plan will appear here."}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          <View style={styles.footerRow}>
+            <TouchableOpacity onPress={onClose} style={styles.outlineButton}>
+              <Text style={styles.outlineText}>Back</Text>
+            </TouchableOpacity>
+            <View style={{ width: 12 }} />
+            <Button onPress={onProceed}>
+              <Text style={styles.buttonText}>Generate Tourist ID</Text>
             </Button>
-          </Card>
+          </View>
         </View>
       </View>
     </Modal>
@@ -54,29 +155,86 @@ export default function TripSummaryModal({ visible, summary, onClose, onProceed 
 }
 
 const styles = StyleSheet.create({
-  bg: {
+  overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.13)",
+    backgroundColor: "rgba(15,23,42,0.7)",
+    padding: 16,
     justifyContent: "center",
-    alignItems: "center",
   },
   modalCard: {
-    width: "90%",
     borderRadius: 16,
-    backgroundColor: "#fff",
-    paddingTop: 10,
-    paddingBottom: 18,
-    ...Platform.select({ android: { elevation: 6 } }),
+    backgroundColor: "#0B0B0B",
+    padding: 16,
+    maxHeight: "90%",
   },
-  header: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 12,
+  },
+  title: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+  },
+  body: {
+    paddingVertical: 4,
+  },
+  row: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+  col: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  label: {
+    color: "#9CA3AF",
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  value: {
+    color: "#F9FAFB",
+    fontSize: 14,
+  },
+  section: {
+    marginTop: 8,
+  },
+  itineraryBox: {
+    marginTop: 4,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "#111827",
+  },
+  itineraryText: {
+    color: "#D1D5DB",
+    fontSize: 12,
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 14,
+  },
+  outlineButton: {
     paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#4B5563",
   },
-  modalTitle: {
-    fontWeight: "700", fontSize: 18,
+  outlineText: {
+    color: "#E5E7EB",
+    fontSize: 14,
+    fontWeight: "500",
   },
-  label: { color: "#6b7280", fontSize: 12, marginTop: 12, marginBottom: 2 },
-  value: { color: "#1e293b", fontWeight: "600", fontSize: 16 },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });
